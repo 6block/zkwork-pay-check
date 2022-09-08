@@ -26,15 +26,24 @@ async function main(address: string, output: string) {
   for (const transaction of transactionList.data.records) {
     const transactionType = transaction.source === 0 ? 'MiningReward' : 'ZKWorkBonus'
     const hash = transaction.txId;
+    if (!hash) {
+      continue;
+    }
     const {blocks} = await transactionService.find({hash, with_blocks: true})
-    const minedBlockIndex = blocks?.findIndex(block => block.main)
-    if (blocks && minedBlockIndex && minedBlockIndex !== -1) {
-      const targetBlock = blocks[minedBlockIndex]
-      await file.appendFile(
-        `OnChain,${transaction.date},${transactionType},${hash},${targetBlock.hash},${targetBlock.sequence}\n`,
-      );
-    } else {
-      `Forked,${transaction.date},${transactionType},${hash}\n`
+    if (blocks) {
+      let onChain = false;
+      for (const block of blocks) {
+        if (block.main) {
+          await file.appendFile(
+            `OnChain,${transaction.date},${transactionType},${hash},${block.hash},${block.sequence}\n`,
+          );
+          onChain = true;
+          break;
+        }
+      }
+      if (!onChain) {
+        await file.appendFile(`Forked,${transaction.date},${transactionType},${hash}\n`);
+      }
     }
   }
 
